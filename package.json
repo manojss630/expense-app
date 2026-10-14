@@ -1,0 +1,31 @@
+{
+  "name": "expense-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ExpenseApp - Modern Full-Stack Expense Tracking Mobile & Web App",
+  "workspaces": [
+    "shared",
+    "server",
+    "web",
+    "mobile"
+  ],
+  "scripts": {
+    "dev:server": "npm --workspace=server run dev",
+    "dev:web": "npm --workspace=web run dev",
+    "dev:mobile": "npm --workspace=mobile run start",
+    "build:shared": "npm --workspace=shared run build",
+    "build:server": "npm --workspace=server run build",
+    "build:web": "npm --workspace=web run build",
+    "test:api": "npx --prefix server tsx src/test-api.ts"
+  },
+  "keywords": [
+    "expense-tracker",
+    "nextjs",
+    "expo",
+    "react-native",
+    "express",
+    "supabase"
+  ],
+  "author": "",
+  "license": "MIT"
+}
