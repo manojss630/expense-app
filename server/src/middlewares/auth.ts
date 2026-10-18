@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { supabaseClient } from '../config/supabase';
+import { supabaseClient, supabaseAdmin } from '../config/supabase';
 import { env } from '../config/env';
 
 export interface AuthenticatedUser {
@@ -33,52 +33,73 @@ export const authMiddleware = async (
 
     const token = authHeader.split(' ')[1];
 
-    // Check if demo token
-    if (token.startsWith('demo-token-') || token === 'demo-token') {
-      req.user = {
-        id: '00000000-0000-0000-0000-000000000001',
-        email: 'ramesh@example.com',
-        full_name: 'Ramesh Kumar',
-        role: 'admin',
-        family_group_id: '11111111-1111-1111-1111-111111111111',
-      };
-      return next();
-    }
+    // 1. Supabase Mode: Verify Supabase Auth access tokens exclusively using Supabase Auth
+    if (!env.IS_DEMO_MODE && (supabaseClient || supabaseAdmin)) {
+      const client = supabaseAdmin || supabaseClient;
+      const { data: { user }, error } = await client!.auth.getUser(token);
 
-    // If using Supabase Client
-    if (supabaseClient) {
-      const { data: { user }, error } = await supabaseClient.auth.getUser(token);
       if (error || !user) {
-        // Fallback check if it's signed with local JWT secret
-        try {
-          const decoded = jwt.verify(token, env.JWT_SECRET) as AuthenticatedUser;
-          req.user = decoded;
-          return next();
-        } catch {
-          res.status(401).json({ success: false, error: 'Unauthorized: Invalid Supabase token' });
-          return;
+        res.status(401).json({
+          success: false,
+          error: error?.message || 'Unauthorized: Invalid or expired Supabase token',
+        });
+        return;
+      }
+
+      let userRole = 'member';
+      let fullName = user.user_metadata?.full_name || 'User';
+
+      if (supabaseAdmin) {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name, role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profile) {
+          userRole = profile.role || 'member';
+          if (profile.full_name) fullName = profile.full_name;
         }
       }
 
       req.user = {
         id: user.id,
         email: user.email || '',
-        full_name: user.user_metadata?.full_name || 'User',
-        role: user.user_metadata?.role || 'member',
+        full_name: fullName,
+        role: userRole,
       };
       return next();
     }
 
-    // Standard JWT verification fallback
-    try {
-      const decoded = jwt.verify(token, env.JWT_SECRET) as AuthenticatedUser;
-      req.user = decoded;
-      return next();
-    } catch {
-      res.status(401).json({ success: false, error: 'Unauthorized: Token verification failed' });
+    // 2. Demo / Offline Mode (ONLY allowed when env.IS_DEMO_MODE is true in local testing):
+    if (env.IS_DEMO_MODE) {
+      if (token.startsWith('demo-token-') || token === 'demo-token') {
+        req.user = {
+          id: '00000000-0000-0000-0000-000000000001',
+          email: 'ramesh@example.com',
+          full_name: 'Ramesh Kumar',
+          role: 'admin',
+          family_group_id: '11111111-1111-1111-1111-111111111111',
+        };
+        return next();
+      }
+
+      // Verify Express self-signed application JWTs using the server-only secret
+      try {
+        const decoded = jwt.verify(token, env.JWT_SECRET) as AuthenticatedUser;
+        req.user = decoded;
+        return next();
+      } catch {
+        res.status(401).json({ success: false, error: 'Unauthorized: Demo token verification failed' });
+        return;
+      }
     }
+
+    res.status(401).json({ success: false, error: 'Unauthorized: Valid Supabase session required' });
+    return;
   } catch (error) {
     console.error('Auth Middleware error:', error);
     res.status(500).json({ success: false, error: 'Internal authentication error' });
   }
 };
+

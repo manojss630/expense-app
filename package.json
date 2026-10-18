@@ -27,5 +27,9 @@
     "supabase"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@types/react": "~18.2.79",
+    "typescript": "~5.3.3"
+  }
 }

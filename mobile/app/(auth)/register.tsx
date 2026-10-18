@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useMobileAuth } from '../../src/context/AuthContext';
 import { useMobileTheme } from '../../src/context/ThemeContext';
+import { mobileApi } from '../../src/api/client';
 
 export default function MobileRegister() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export default function MobileRegister() {
   const [password, setPassword] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
 
   const handlePickAvatar = async () => {
     try {
@@ -57,18 +59,57 @@ export default function MobileRegister() {
     }
     try {
       setError(null);
-      await register({
-        full_name: fullName,
-        email,
-        phone: phone || undefined,
+      const res = await register({
+        full_name: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
         password,
-        avatar_url: avatarUri || undefined,
       });
+
+      if (res?.emailConfirmationRequired) {
+        setEmailSent(true);
+        return;
+      }
+
+      // If user uploaded an avatar and is immediately logged in
+      if (avatarUri) {
+        try {
+          await mobileApi.uploadAvatar(avatarUri);
+        } catch (e: any) {
+          console.warn('Post-registration avatar upload failed:', e.message);
+        }
+      }
+
       router.replace('/(tabs)');
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     }
   };
+
+  if (emailSent) {
+    return (
+      <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center' }]}>
+          <View style={[styles.logoBadge, { backgroundColor: '#10B981' }]}>
+            <MaterialCommunityIcons name="email-check-outline" size={40} color="#FFFFFF" />
+          </View>
+          <Text style={[styles.title, { color: colors.text, textAlign: 'center', marginTop: 12 }]}>
+            Check Your Email
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.subtext, textAlign: 'center', marginTop: 8 }]}>
+            We sent a confirmation link to <Text style={{ fontWeight: '700', color: colors.text }}>{email}</Text>.
+            Please verify your email address, then return here to sign in.
+          </Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, { width: '100%', marginTop: 24 }]}
+            onPress={() => router.replace('/(auth)/login')}
+          >
+            <Text style={styles.primaryButtonText}>Go to Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -114,7 +155,7 @@ export default function MobileRegister() {
             <MaterialCommunityIcons name="account-outline" size={18} color={colors.subtext} />
             <TextInput
               style={[styles.input, { color: colors.text }]}
-              placeholder="Ramesh Kumar"
+              placeholder="Your Name"
               placeholderTextColor={colors.subtext}
               value={fullName}
               onChangeText={setFullName}
@@ -127,7 +168,7 @@ export default function MobileRegister() {
             <MaterialCommunityIcons name="email-outline" size={18} color={colors.subtext} />
             <TextInput
               style={[styles.input, { color: colors.text }]}
-              placeholder="ramesh@example.com"
+              placeholder="user@example.com"
               placeholderTextColor={colors.subtext}
               autoCapitalize="none"
               keyboardType="email-address"
@@ -194,6 +235,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
   scroll: {
     padding: 24,
     justifyContent: 'center',
@@ -251,6 +297,14 @@ const styles = StyleSheet.create({
   avatarHint: {
     fontSize: 11,
     marginTop: 2,
+  },
+  logoBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   errorBox: {
     flexDirection: 'row',

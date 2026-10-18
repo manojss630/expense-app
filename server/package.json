@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "tsx src/test-api.ts"
   },
   "dependencies": {
     "@expense-app/shared": "file:../shared",
@@ -35,3 +36,4 @@
     "typescript": "^5.5.4"
   }
 }
+

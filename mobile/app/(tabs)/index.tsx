@@ -57,12 +57,12 @@ export default function MobileDashboard() {
             {user?.avatar_url ? (
               <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
             ) : (
-              <Text style={styles.avatarText}>{user?.full_name?.charAt(0) || 'R'}</Text>
+              <Text style={styles.avatarText}>{user?.full_name?.charAt(0) || 'U'}</Text>
             )}
           </View>
           <View>
             <Text style={[styles.greeting, { color: colors.text }]}>
-              Hi, {user?.full_name?.split(' ')[0] || 'Ramesh'} 👋
+              Hi, {user?.full_name?.split(' ')[0] || 'User'} 👋
             </Text>
             <Text style={[styles.subgreeting, { color: colors.subtext }]}>Family Expenses</Text>
           </View>
@@ -118,7 +118,7 @@ export default function MobileDashboard() {
           </TouchableOpacity>
         </View>
 
-        {/* Family Member Spending Cards (Highlighting Brother Suresh) */}
+        {/* Family Member Spending Cards */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Member Spending</Text>
           <Text style={[styles.sectionSub, { color: colors.subtext }]}>Individual Totals</Text>
@@ -343,3 +343,4 @@ const styles = StyleSheet.create({
   txNote: { fontSize: 11, marginTop: 2 },
   txAmount: { fontSize: 15, fontWeight: '800' },
 });
+

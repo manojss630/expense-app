@@ -94,7 +94,7 @@ export interface ApiResponse<T = any> {
 }
 
 export interface AuthSession {
-  user: {
+  user?: {
     id: string;
     email: string;
     full_name: string;
@@ -102,7 +102,9 @@ export interface AuthSession {
     avatar_url?: string;
     role: string;
   };
-  token: string;
+  token?: string;
   refreshToken?: string;
   familyGroup?: FamilyGroup;
+  emailConfirmationRequired?: boolean;
 }
+

@@ -67,3 +67,4 @@ export function MobileThemeProvider({ children }: { children: React.ReactNode })
 }
 
 export const useMobileTheme = () => useContext(ThemeContext);
+

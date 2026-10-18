@@ -18,7 +18,16 @@ import {
   UpdateProfileInput,
 } from '@expense-app/shared';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
+function normalizeApiUrl(rawUrl?: string): string {
+  if (!rawUrl) return '/api';
+  let url = rawUrl.trim().replace(/\/+$/, '');
+  if (!url.endsWith('/api')) {
+    url = `${url}/api`;
+  }
+  return url;
+}
+
+export const API_BASE = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
 
 class ApiClient {
   private getToken(): string | null {
@@ -37,10 +46,48 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const response = await fetch(`${API_BASE}${cleanEndpoint}`, {
       ...options,
       headers,
     });
+
+    if (response.status === 401 && !endpoint.includes('/auth/')) {
+      const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('expense_app_refresh_token') : null;
+      if (refreshToken) {
+        try {
+          const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+          });
+          const refreshJson = await refreshRes.json();
+          if (refreshRes.ok && refreshJson.success && refreshJson.data?.token) {
+            localStorage.setItem('expense_app_token', refreshJson.data.token);
+            if (refreshJson.data.refreshToken) {
+              localStorage.setItem('expense_app_refresh_token', refreshJson.data.refreshToken);
+            }
+            // Retry the original request with refreshed token
+            headers['Authorization'] = `Bearer ${refreshJson.data.token}`;
+            const retryRes = await fetch(`${API_BASE}${cleanEndpoint}`, {
+              ...options,
+              headers,
+            });
+            const retryJson = await retryRes.json();
+            if (retryRes.ok && retryJson.success) {
+              return retryJson.data !== undefined ? retryJson.data : retryJson;
+            }
+          }
+        } catch {
+          // Refresh failed, proceed to clean up credentials
+        }
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('expense_app_token');
+        localStorage.removeItem('expense_app_refresh_token');
+        localStorage.removeItem('expense_app_user');
+      }
+    }
 
     const json = await response.json();
 
@@ -240,3 +287,4 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
+

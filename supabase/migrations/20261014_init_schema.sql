@@ -342,3 +342,4 @@ VALUES
     ('Education', 'BookOpen', '#06B6D4', true, NULL),
     ('Other', 'MoreHorizontal', '#6B7280', true, NULL)
 ON CONFLICT DO NOTHING;
+

@@ -40,3 +40,4 @@ router.post('/', authMiddleware, validateBody(createCategorySchema), async (req:
 });
 
 export default router;
+

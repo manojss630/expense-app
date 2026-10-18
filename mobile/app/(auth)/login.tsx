@@ -17,7 +17,7 @@ import { useMobileTheme } from '../../src/context/ThemeContext';
 
 export default function MobileLogin() {
   const router = useRouter();
-  const { login, demoLogin, loading } = useMobileAuth();
+  const { login, loading } = useMobileAuth();
   const { colors } = useMobileTheme();
 
   const [email, setEmail] = useState('');
@@ -31,20 +31,10 @@ export default function MobileLogin() {
     }
     try {
       setError(null);
-      await login({ email, password });
+      await login({ email: email.trim(), password });
       router.replace('/(tabs)');
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
-    }
-  };
-
-  const handleDemo = async () => {
-    try {
-      setError(null);
-      await demoLogin();
-      router.replace('/(tabs)');
-    } catch (err: any) {
-      setError(err.message || 'Demo login failed');
     }
   };
 
@@ -80,7 +70,7 @@ export default function MobileLogin() {
             <MaterialCommunityIcons name="email-outline" size={18} color={colors.subtext} />
             <TextInput
               style={[styles.input, { color: colors.text }]}
-              placeholder="ramesh@example.com"
+              placeholder="user@example.com"
               placeholderTextColor={colors.subtext}
               autoCapitalize="none"
               keyboardType="email-address"
@@ -114,18 +104,6 @@ export default function MobileLogin() {
             ) : (
               <Text style={styles.primaryButtonText}>Sign In</Text>
             )}
-          </TouchableOpacity>
-
-          {/* Demo Button */}
-          <View style={styles.divider}>
-            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-            <Text style={[styles.dividerText, { color: colors.subtext }]}>OR DEMO MODE</Text>
-            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-          </View>
-
-          <TouchableOpacity style={styles.demoButton} onPress={handleDemo}>
-            <MaterialCommunityIcons name="account-arrow-right" size={18} color="#6366F1" />
-            <Text style={styles.demoButtonText}>Continue as Ramesh Kumar (Demo)</Text>
           </TouchableOpacity>
         </View>
 
@@ -237,36 +215,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 18,
-    gap: 10,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  demoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#EEF2FF',
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-  },
-  demoButtonText: {
-    color: '#4F46E5',
-    fontSize: 13,
-    fontWeight: '600',
   },
   footer: {
     flexDirection: 'row',

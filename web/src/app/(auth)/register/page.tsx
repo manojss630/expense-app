@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,19 +33,46 @@ export default function RegisterPage() {
     try {
       setLoading(true);
       setError(null);
-      await register({
+      const res = await register({
         full_name: fullName,
         email,
         phone: phone || undefined,
         password,
         avatar_url: avatarPreview || undefined,
       });
+
+      if (res?.emailConfirmationRequired) {
+        setEmailSent(true);
+      }
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
+
+  if (emailSent) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
+          <div className="bg-white dark:bg-slate-900 py-8 px-6 sm:px-10 rounded-2xl border border-slate-200/80 dark:border-slate-800 card-shadow text-center">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center mb-4">
+              <Mail className="w-7 h-7" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Check Your Email</h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              We&apos;ve sent a verification link to <span className="font-semibold text-slate-900 dark:text-white">{email}</span>. Please click the link to confirm your account, then sign in.
+            </p>
+            <div className="mt-6">
+              <Link href="/login">
+                <Button className="w-full">Proceed to Sign In</Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -180,3 +208,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+

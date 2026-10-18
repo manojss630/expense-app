@@ -15,6 +15,14 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for receipts
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid receipt file format. Allowed: JPEG, PNG, WEBP, PDF'));
+    }
+  },
 });
 
 // GET /api/expenses
@@ -72,7 +80,7 @@ router.post('/upload-receipt', authMiddleware, upload.single('receipt'), async (
     let receiptUrl = '';
 
     if (supabaseAdmin && !env.IS_DEMO_MODE) {
-      const ext = req.file.mimetype.split('/')[1] || 'jpg';
+      const ext = req.file.mimetype === 'application/pdf' ? 'pdf' : (req.file.mimetype.split('/')[1] || 'jpg');
       const filePath = `${userId}/receipt_${Date.now()}.${ext}`;
 
       const { error: uploadError } = await supabaseAdmin.storage
@@ -87,8 +95,17 @@ router.post('/upload-receipt', authMiddleware, upload.single('receipt'), async (
         return;
       }
 
-      const { data: { publicUrl } } = supabaseAdmin.storage.from('receipts').getPublicUrl(filePath);
-      receiptUrl = publicUrl;
+      // Generate signed URL (valid for 7 days) for private bucket, fallback to publicUrl
+      const { data: signedData } = await supabaseAdmin.storage
+        .from('receipts')
+        .createSignedUrl(filePath, 60 * 60 * 24 * 7);
+
+      if (signedData?.signedUrl) {
+        receiptUrl = signedData.signedUrl;
+      } else {
+        const { data: { publicUrl } } = supabaseAdmin.storage.from('receipts').getPublicUrl(filePath);
+        receiptUrl = publicUrl;
+      }
     } else {
       receiptUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     }
@@ -139,3 +156,4 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
 });
 
 export default router;
+

@@ -79,11 +79,17 @@ export default function MobileReports() {
 
     try {
       setGeneratingPdf(true);
-      const downloadUrl = mobileApi.getPdfDownloadUrl(pdfInfo.reportId);
+      const downloadPath = (pdfInfo as any).directStreamUrl || mobileApi.getPdfDownloadUrl(pdfInfo.reportId);
+      const downloadUrl = downloadPath.startsWith('http')
+        ? downloadPath
+        : `${mobileApi.getPdfDownloadUrl(pdfInfo.reportId)}`;
       const localUri = `${FileSystem.documentDirectory}${pdfInfo.filename}`;
 
       // Download file to local storage
-      const downloadRes = await FileSystem.downloadAsync(downloadUrl, localUri);
+      const token = mobileApi.getToken();
+      const downloadRes = await FileSystem.downloadAsync(downloadUrl, localUri, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
 
       // Check if sharing is available on device
       const isAvailable = await Sharing.isAvailableAsync();
@@ -296,3 +302,4 @@ const styles = StyleSheet.create({
   catPercent: { fontSize: 11, marginTop: 1 },
   emptyText: { textAlign: 'center', padding: 20, fontSize: 13 },
 });
+

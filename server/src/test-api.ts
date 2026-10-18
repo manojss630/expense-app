@@ -1,7 +1,8 @@
-import app from './index';
+process.env.DEMO_MODE = 'true';
 import http from 'http';
 
 async function runTests() {
+  const { default: app } = await import('./index');
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(5001, () => resolve()));
   console.log('Test Server listening on port 5001');
@@ -87,7 +88,7 @@ async function runTests() {
 
     // 8. Download / Stream PDF
     console.log('\nTesting PDF Stream GET...');
-    const streamRes = await fetch(`http://localhost:5001${pdfJson.data.downloadUrl}`);
+    const streamRes = await fetch(`http://localhost:5001${pdfJson.data.downloadUrl}`, { headers: authHeaders });
     const pdfBuffer = await streamRes.arrayBuffer();
     console.log('✓ Streamed PDF Content-Type:', streamRes.headers.get('content-type'));
     console.log('✓ Streamed PDF buffer length:', pdfBuffer.byteLength);
@@ -104,3 +105,4 @@ runTests().catch((err) => {
   console.error('Test execution failed:', err);
   process.exit(1);
 });
+

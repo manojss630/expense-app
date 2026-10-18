@@ -107,7 +107,6 @@ Set the following variables:
 # Server
 PORT=5000
 NODE_ENV=development
-JWT_SECRET=your-32-char-random-jwt-secret-key-here
 CORS_ORIGIN=*
 
 # Supabase (Get from Project Settings -> API)
@@ -124,7 +123,9 @@ API_BASE_URL=http://localhost:5000/api
 EXPO_PUBLIC_API_URL=http://localhost:5000/api
 ```
 
-> **Note**: If Supabase variables are left empty, the application automatically runs in **Demo Mode**, using a memory-backed store preloaded with Ramesh Kumar and his brother Suresh's expenses. This allows immediate testing with zero setup.
+> **Authentication Architecture**:
+> - **Production Mode (Supabase)**: Access tokens are issued and cryptographically signed by Supabase Auth. The Express backend verifies them directly via Supabase Auth (`supabase.auth.getUser(token)`). **No local `JWT_SECRET` is required** for production, and Supabase project signing keys are never manually handled or rotated by Express.
+> - **Offline Demo Mode**: If Supabase variables are left empty, the application automatically runs in Demo Mode with an in-memory store. In this mode alone, Express self-signs mock tokens using an internal server secret (`JWT_SECRET`) for offline local testing.
 
 ---
 
@@ -266,3 +267,4 @@ When the build completes, EAS provides a direct download link for the `.apk` fil
 4. Ramesh clicks **"Generate PDF Report"** on the Reports screen.
 5. The PDF statement is rendered with an itemized transaction ledger, category breakdown pie/bar, and total amount.
 6. Ramesh clicks **"Share to WhatsApp"** to send the statement directly to his brother!
+

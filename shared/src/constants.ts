@@ -23,3 +23,4 @@ export const APP_CONFIG = {
   CURRENCY_CODE: 'INR',
   DEFAULT_PAGE_SIZE: 50,
 };
+

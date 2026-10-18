@@ -136,13 +136,23 @@ export default function MobileExpenses() {
       setSaving(true);
       setFormError(null);
 
+      let finalReceiptUrl = receiptUri;
+      if (receiptUri && !receiptUri.startsWith('http')) {
+        try {
+          const uploaded = await mobileApi.uploadReceipt(receiptUri);
+          finalReceiptUrl = uploaded.receipt_url;
+        } catch (uploadErr: any) {
+          console.warn('Receipt upload failed, continuing with expense save:', uploadErr.message);
+        }
+      }
+
       const payload = {
         amount: parsedAmount,
         member_id: formMemberId,
         category_id: formCategoryId,
         expense_date: formDate,
         note: note.trim() || undefined,
-        receipt_url: receiptUri || undefined,
+        receipt_url: finalReceiptUrl || undefined,
       };
 
       if (editingExpenseId) {

@@ -19,3 +19,4 @@ if (env.SUPABASE_URL && env.SUPABASE_ANON_KEY && !env.IS_DEMO_MODE) {
     console.error('Failed to initialize Supabase client:', error);
   }
 }
+

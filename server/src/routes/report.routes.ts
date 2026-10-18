@@ -39,6 +39,12 @@ router.post('/pdf', authMiddleware, validateBody(pdfReportRequestSchema), async 
       generatedBy: req.user!.full_name,
     });
 
+    const downloadQuery = new URLSearchParams();
+    if (from) downloadQuery.append('from', from);
+    if (to) downloadQuery.append('to', to);
+    if (memberId) downloadQuery.append('memberId', memberId);
+    if (title) downloadQuery.append('title', title);
+
     res.json({
       success: true,
       data: {
@@ -46,6 +52,7 @@ router.post('/pdf', authMiddleware, validateBody(pdfReportRequestSchema), async 
         filename,
         size: buffer.length,
         downloadUrl: `/api/reports/pdf/${reportId}`,
+        directStreamUrl: `/api/reports/pdf/download?${downloadQuery.toString()}`,
       },
       message: 'PDF report generated successfully',
     });
@@ -54,8 +61,32 @@ router.post('/pdf', authMiddleware, validateBody(pdfReportRequestSchema), async 
   }
 });
 
+// GET /api/reports/pdf/download (Stateless On-Demand Streaming for Serverless / Vercel)
+router.get('/pdf/download', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const { from, to, memberId, title } = req.query as any;
+
+    const summary = await DataService.getSummary(userId, { from, to, memberId });
+    const { expenses } = await DataService.getExpenses(userId, { from, to, memberId, limit: 1000 });
+
+    const { filename, buffer } = await PdfService.generateExpenseReport(summary, expenses, {
+      title,
+      preparedFor: summary.memberName,
+      generatedBy: req.user!.full_name,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to stream on-demand PDF' });
+  }
+});
+
 // GET /api/reports/pdf/:reportId
-router.get('/pdf/:reportId', async (req: Request, res: Response): Promise<void> => {
+router.get('/pdf/:reportId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { reportId } = req.params;
     const report = PdfService.getCachedReport(reportId);
@@ -75,3 +106,4 @@ router.get('/pdf/:reportId', async (req: Request, res: Response): Promise<void> 
 });
 
 export default router;
+

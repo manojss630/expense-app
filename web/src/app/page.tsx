@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
-  const { user, loading, demoLogin } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -64,18 +64,19 @@ export default function HomePage() {
 
         {/* CTA Buttons */}
         <div className="mt-8 flex flex-col sm:flex-row items-center gap-3.5 w-full justify-center">
-          <Button
-            size="lg"
-            onClick={() => demoLogin()}
-            className="w-full sm:w-auto shadow-lg shadow-indigo-500/25"
-          >
-            <span>Try Live Demo as Ramesh</span>
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-
           <Link href="/register" className="w-full sm:w-auto">
+            <Button
+              size="lg"
+              className="w-full sm:w-auto shadow-lg shadow-indigo-500/25 gap-2"
+            >
+              <span>Create Free Account</span>
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </Link>
+
+          <Link href="/login" className="w-full sm:w-auto">
             <Button variant="outline" size="lg" className="w-full">
-              Create Free Account
+              Sign In to Your Family
             </Button>
           </Link>
         </div>
@@ -90,7 +91,7 @@ export default function HomePage() {
               Family Member Splitting
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Add expenses for yourself or family members like Ramesh tracking his brother's fuel & spares.
+              Add expenses for yourself or family members with individual spending totals.
             </p>
           </div>
 

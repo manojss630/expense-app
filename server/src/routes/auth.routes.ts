@@ -37,11 +37,7 @@ router.post('/register', validateBody(registerSchema), async (req: Request, res:
         return;
       }
 
-      const token = data.session?.access_token || jwt.sign(
-        { id: data.user.id, email: data.user.email, full_name, role: 'admin' },
-        env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
+      const token = data.session?.access_token || null;
 
       res.status(201).json({
         success: true,
@@ -52,9 +48,10 @@ router.post('/register', validateBody(registerSchema), async (req: Request, res:
             full_name,
             phone,
             avatar_url,
-            role: 'admin',
+            role: 'member',
           },
           token,
+          emailConfirmationRequired: !token,
         },
       });
       return;
@@ -98,8 +95,8 @@ router.post('/login', validateBody(loginSchema), async (req: Request, res: Respo
   try {
     const { email, password } = req.body;
 
-    // Demo mode quick access / Ramesh login check
-    if (email === 'ramesh@example.com' || env.IS_DEMO_MODE) {
+    // Demo mode: only when Supabase is not configured or DEMO_MODE is active
+    if (env.IS_DEMO_MODE || !supabaseClient) {
       const { profile, familyGroup } = await DataService.getProfile('00000000-0000-0000-0000-000000000001');
       const token = jwt.sign(
         { id: profile.id, email, full_name: profile.full_name, role: profile.role },
@@ -171,4 +168,38 @@ router.post('/logout', async (req: Request, res: Response): Promise<void> => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
+// POST /api/auth/refresh
+router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refresh_token } = req.body;
+    if (!refresh_token) {
+      res.status(400).json({ success: false, error: 'Missing refresh token' });
+      return;
+    }
+
+    if (supabaseClient && !env.IS_DEMO_MODE) {
+      const { data, error } = await supabaseClient.auth.refreshSession({ refresh_token });
+      if (error || !data.session) {
+        res.status(401).json({ success: false, error: error?.message || 'Failed to refresh session' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          token: data.session.access_token,
+          refreshToken: data.session.refresh_token,
+          expires_at: data.session.expires_at,
+        },
+      });
+      return;
+    }
+
+    res.status(400).json({ success: false, error: 'Token refresh is unavailable in offline mode' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Token refresh error' });
+  }
+});
+
 export default router;
+

@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Wallet, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Wallet, Mail, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 
 export default function LoginPage() {
-  const { login, demoLogin } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -87,7 +87,7 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
                 />
               </div>
             </div>
@@ -96,24 +96,9 @@ export default function LoginPage() {
               Sign In
             </Button>
           </form>
-
-          {/* Quick Demo Login Shortcut */}
-          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-            <p className="text-xs text-center text-slate-500 dark:text-slate-400 mb-3">
-              Want to see Ramesh tracking expenses for his brother?
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => demoLogin()}
-              className="w-full"
-            >
-              <span>Instant Demo Login (Ramesh Kumar)</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
         </div>
       </div>
     </div>
   );
 }
+

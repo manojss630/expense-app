@@ -168,6 +168,62 @@ const memoryStore = new MemoryStore();
 
 export class DataService {
   // --------------------------------------------------------------------------
+  // Authorization & Family Scoping Helper
+  // --------------------------------------------------------------------------
+  static async getUserFamilyGroupId(userId: string): Promise<string> {
+    if (supabaseAdmin && !env.IS_DEMO_MODE) {
+      // 1. Check if user is owner of a family group
+      const { data: ownedGroup } = await supabaseAdmin
+        .from('family_groups')
+        .select('id')
+        .eq('owner_id', userId)
+        .maybeSingle();
+
+      if (ownedGroup?.id) return ownedGroup.id;
+
+      // 2. Check if user is linked member of a family group
+      const { data: memberRecord } = await supabaseAdmin
+        .from('family_members')
+        .select('family_group_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (memberRecord?.family_group_id) return memberRecord.family_group_id;
+
+      // 3. Fallback: Create default family group if missing (e.g. signup trigger was delayed)
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const familyName = `${profile?.full_name || 'My'} Family`;
+      const { data: newGroup, error: groupErr } = await supabaseAdmin
+        .from('family_groups')
+        .insert({ name: familyName, owner_id: userId })
+        .select('id')
+        .single();
+
+      if (groupErr || !newGroup) {
+        throw new Error('Unable to resolve family group for user');
+      }
+
+      await supabaseAdmin
+        .from('family_members')
+        .insert({
+          family_group_id: newGroup.id,
+          user_id: userId,
+          display_name: `${profile?.full_name || 'Me'} (Self)`,
+        });
+
+      return newGroup.id;
+    }
+
+    const firstGroup = Array.from(memoryStore.familyGroups.values())[0];
+    return firstGroup?.id || '11111111-1111-1111-1111-111111111111';
+  }
+
+  // --------------------------------------------------------------------------
   // Profile & Family
   // --------------------------------------------------------------------------
   static async getProfile(userId: string): Promise<{ profile: Profile; familyGroup: FamilyGroup | null }> {
@@ -179,11 +235,11 @@ export class DataService {
         .single();
       if (error) throw error;
 
-      // Find user's family group (either owner or member)
+      const familyGroupId = await this.getUserFamilyGroupId(userId);
       const { data: group } = await supabaseAdmin
         .from('family_groups')
         .select('*')
-        .eq('owner_id', userId)
+        .eq('id', familyGroupId)
         .maybeSingle();
 
       return { profile, familyGroup: group || null };
@@ -238,19 +294,12 @@ export class DataService {
   // --------------------------------------------------------------------------
   static async getFamilyMembers(userId: string): Promise<FamilyMember[]> {
     if (supabaseAdmin && !env.IS_DEMO_MODE) {
-      // Find group first
-      const { data: group } = await supabaseAdmin
-        .from('family_groups')
-        .select('id')
-        .eq('owner_id', userId)
-        .single();
-
-      if (!group) return [];
+      const familyGroupId = await this.getUserFamilyGroupId(userId);
 
       const { data: members, error } = await supabaseAdmin
         .from('family_members')
         .select('*')
-        .eq('family_group_id', group.id)
+        .eq('family_group_id', familyGroupId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -267,18 +316,12 @@ export class DataService {
     linkedUserId?: string | null
   ): Promise<FamilyMember> {
     if (supabaseAdmin && !env.IS_DEMO_MODE) {
-      const { data: group } = await supabaseAdmin
-        .from('family_groups')
-        .select('id')
-        .eq('owner_id', userId)
-        .single();
-
-      if (!group) throw new Error('Family group not found for user');
+      const familyGroupId = await this.getUserFamilyGroupId(userId);
 
       const { data: member, error } = await supabaseAdmin
         .from('family_members')
         .insert({
-          family_group_id: group.id,
+          family_group_id: familyGroupId,
           user_id: linkedUserId || null,
           display_name: displayName,
         })
@@ -309,14 +352,14 @@ export class DataService {
       const { data, error } = await supabaseAdmin
         .from('categories')
         .select('*')
-        .or(`is_default.eq.true,user_id.eq.${userId}`)
+        .or(`and(is_default.eq.true,user_id.is.null),user_id.eq.${userId}`)
         .order('name');
       if (error) throw error;
       return data || [];
     }
 
     return Array.from(memoryStore.categories.values()).filter(
-      (c) => c.is_default || c.user_id === userId
+      (c) => (c.is_default && (c.user_id === null || c.user_id === undefined)) || c.user_id === userId
     );
   }
 
@@ -354,7 +397,7 @@ export class DataService {
   }
 
   // --------------------------------------------------------------------------
-  // Expenses CRUD
+  // Expenses CRUD (Strictly Scoped by Family Group)
   // --------------------------------------------------------------------------
   static async getExpenses(
     userId: string,
@@ -369,11 +412,14 @@ export class DataService {
     }
   ): Promise<{ expenses: ExpenseWithDetails[]; totalCount: number }> {
     if (supabaseAdmin && !env.IS_DEMO_MODE) {
+      const familyGroupId = await this.getUserFamilyGroupId(userId);
+
       let query = supabaseAdmin
         .from('expenses')
         .select('*, category:categories(*), member:family_members(*), profile:profiles(*)', {
           count: 'exact',
-        });
+        })
+        .eq('family_group_id', familyGroupId);
 
       if (filters.from) query = query.gte('expense_date', filters.from);
       if (filters.to) query = query.lte('expense_date', filters.to);
@@ -446,19 +492,33 @@ export class DataService {
     }
   ): Promise<ExpenseWithDetails> {
     if (supabaseAdmin && !env.IS_DEMO_MODE) {
+      const familyGroupId = await this.getUserFamilyGroupId(userId);
+
+      // Verify member belongs to this family group
       const { data: member } = await supabaseAdmin
         .from('family_members')
-        .select('family_group_id')
+        .select('id')
         .eq('id', data.member_id)
-        .single();
+        .eq('family_group_id', familyGroupId)
+        .maybeSingle();
 
-      if (!member) throw new Error('Member not found');
+      if (!member) throw new Error('Unauthorized: Target member does not belong to your family group');
+
+      // Verify category is valid (default or owned by this user)
+      const { data: cat } = await supabaseAdmin
+        .from('categories')
+        .select('id')
+        .eq('id', data.category_id)
+        .or(`and(is_default.eq.true,user_id.is.null),user_id.eq.${userId}`)
+        .maybeSingle();
+
+      if (!cat) throw new Error('Unauthorized: Category not found or inaccessible');
 
       const { data: expense, error } = await supabaseAdmin
         .from('expenses')
         .insert({
           user_id: userId,
-          family_group_id: member.family_group_id,
+          family_group_id: familyGroupId,
           member_id: data.member_id,
           category_id: data.category_id,
           amount: data.amount,
@@ -505,12 +565,50 @@ export class DataService {
     updates: Partial<Expense>
   ): Promise<ExpenseWithDetails> {
     if (supabaseAdmin && !env.IS_DEMO_MODE) {
+      const familyGroupId = await this.getUserFamilyGroupId(userId);
+
+      // Verify expense belongs to this family group
+      const { data: existing } = await supabaseAdmin
+        .from('expenses')
+        .select('id')
+        .eq('id', expenseId)
+        .eq('family_group_id', familyGroupId)
+        .maybeSingle();
+
+      if (!existing) throw new Error('Unauthorized: Expense not found in your family group');
+
+      // If updating member, verify new member belongs to family group
+      if (updates.member_id) {
+        const { data: member } = await supabaseAdmin
+          .from('family_members')
+          .select('id')
+          .eq('id', updates.member_id)
+          .eq('family_group_id', familyGroupId)
+          .maybeSingle();
+
+        if (!member) throw new Error('Unauthorized: New member does not belong to your family group');
+      }
+
+      // If updating category, verify category is accessible
+      if (updates.category_id) {
+        const { data: cat } = await supabaseAdmin
+          .from('categories')
+          .select('id')
+          .eq('id', updates.category_id)
+          .or(`and(is_default.eq.true,user_id.is.null),user_id.eq.${userId}`)
+          .maybeSingle();
+
+        if (!cat) throw new Error('Unauthorized: Inaccessible category');
+      }
+
       const { data, error } = await supabaseAdmin
         .from('expenses')
         .update(updates)
         .eq('id', expenseId)
+        .eq('family_group_id', familyGroupId)
         .select('*, category:categories(*), member:family_members(*)')
         .single();
+
       if (error) throw error;
       return data as any;
     }
@@ -531,7 +629,14 @@ export class DataService {
 
   static async deleteExpense(userId: string, expenseId: string): Promise<boolean> {
     if (supabaseAdmin && !env.IS_DEMO_MODE) {
-      const { error } = await supabaseAdmin.from('expenses').delete().eq('id', expenseId);
+      const familyGroupId = await this.getUserFamilyGroupId(userId);
+
+      const { error } = await supabaseAdmin
+        .from('expenses')
+        .delete()
+        .eq('id', expenseId)
+        .eq('family_group_id', familyGroupId);
+
       if (error) throw error;
       return true;
     }
@@ -651,3 +756,4 @@ export class DataService {
     };
   }
 }
+

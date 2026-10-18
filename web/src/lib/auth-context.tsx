@@ -18,20 +18,18 @@ interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
   login: (data: LoginInput) => Promise<void>;
-  register: (data: RegisterInput) => Promise<void>;
+  register: (data: RegisterInput) => Promise<{ emailConfirmationRequired?: boolean }>;
   logout: () => Promise<void>;
   updateUser: (updated: Partial<AuthUser>) => void;
-  demoLogin: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   login: async () => {},
-  register: async () => {},
+  register: async () => ({}),
   logout: async () => {},
   updateUser: () => {},
-  demoLogin: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -44,7 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const storedUser = localStorage.getItem('expense_app_user');
       const token = localStorage.getItem('expense_app_token');
 
-      if (storedUser && token) {
+      // Purge legacy demo user/token
+      if (token === 'demo-token' || storedUser?.includes('00000000-0000-0000-0000-000000000001')) {
+        localStorage.removeItem('expense_app_token');
+        localStorage.removeItem('expense_app_user');
+        setUser(null);
+      } else if (storedUser && token) {
         setUser(JSON.parse(storedUser));
       }
     } catch (e) {
@@ -56,31 +59,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (data: LoginInput) => {
     const session = await api.login(data);
+    if (!session.token || !session.user) {
+      throw new Error('No authentication token or user profile received from server.');
+    }
     localStorage.setItem('expense_app_token', session.token);
+    if (session.refreshToken) {
+      localStorage.setItem('expense_app_refresh_token', session.refreshToken);
+    }
     localStorage.setItem('expense_app_user', JSON.stringify(session.user));
     setUser(session.user);
     router.push('/dashboard');
   };
 
-  const register = async (data: RegisterInput) => {
-    const session = await api.register(data);
+  const register = async (data: RegisterInput): Promise<{ emailConfirmationRequired?: boolean }> => {
+    const session: any = await api.register(data);
+
+    if (session.emailConfirmationRequired || !session.token || !session.user) {
+      return { emailConfirmationRequired: true };
+    }
+
     localStorage.setItem('expense_app_token', session.token);
+    if (session.refreshToken) {
+      localStorage.setItem('expense_app_refresh_token', session.refreshToken);
+    }
     localStorage.setItem('expense_app_user', JSON.stringify(session.user));
     setUser(session.user);
     router.push('/dashboard');
-  };
-
-  const demoLogin = async () => {
-    await login({
-      email: 'ramesh@example.com',
-      password: 'password123',
-    });
+    return { emailConfirmationRequired: false };
   };
 
   const logout = async () => {
-    await api.logout();
-    setUser(null);
-    router.push('/login');
+    try {
+      await api.logout();
+    } finally {
+      setUser(null);
+      localStorage.removeItem('expense_app_token');
+      localStorage.removeItem('expense_app_refresh_token');
+      localStorage.removeItem('expense_app_user');
+      router.push('/login');
+    }
   };
 
   const updateUser = (updated: Partial<AuthUser>) => {
@@ -99,7 +116,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         updateUser,
-        demoLogin,
       }}
     >
       {children}
@@ -108,3 +124,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
+

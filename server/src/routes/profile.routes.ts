@@ -11,6 +11,14 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid image format. Allowed: JPEG, PNG, WEBP, GIF'));
+    }
+  },
 });
 
 // GET /api/profile
@@ -77,8 +85,17 @@ router.post('/avatar', authMiddleware, upload.single('avatar'), async (req: Requ
         return;
       }
 
-      const { data: { publicUrl } } = supabaseAdmin.storage.from('avatars').getPublicUrl(filePath);
-      avatarUrl = publicUrl;
+      // Try signed URL first for private bucket, fallback to publicUrl
+      const { data: signedData } = await supabaseAdmin.storage
+        .from('avatars')
+        .createSignedUrl(filePath, 60 * 60 * 24 * 30); // 30 days
+
+      if (signedData?.signedUrl) {
+        avatarUrl = signedData.signedUrl;
+      } else {
+        const { data: { publicUrl } } = supabaseAdmin.storage.from('avatars').getPublicUrl(filePath);
+        avatarUrl = publicUrl;
+      }
     } else {
       // Demo base64 data URI
       avatarUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
@@ -136,3 +153,4 @@ router.post('/delete-account', authMiddleware, async (req: Request, res: Respons
 });
 
 export default router;
+

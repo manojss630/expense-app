@@ -40,3 +40,4 @@ router.post('/members', authMiddleware, validateBody(createFamilyMemberSchema), 
 });
 
 export default router;
+

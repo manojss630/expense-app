@@ -11,15 +11,15 @@ export default function SplashScreen() {
   const { colors } = useMobileTheme();
 
   useEffect(() => {
+    if (loading) return;
+
     const timer = setTimeout(() => {
-      if (!loading) {
-        if (user) {
-          router.replace('/(tabs)');
-        } else {
-          router.replace('/(auth)/login');
-        }
+      if (user) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/login');
       }
-    }, 1200);
+    }, 600);
 
     return () => clearTimeout(timer);
   }, [user, loading, router]);

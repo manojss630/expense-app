@@ -33,6 +33,7 @@ export default function MobileProfile() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Password State
   const [newPassword, setNewPassword] = useState('');
@@ -48,8 +49,8 @@ export default function MobileProfile() {
         setFamilyGroupName(data.familyGroup?.name || 'Family');
         setFullName(data.profile.full_name || '');
         setPhone(data.profile.phone || '');
-      } catch (e) {
-        console.warn('Profile fetch error:', e);
+      } catch (e: any) {
+        console.warn('Profile fetch error:', e.message);
       } finally {
         setLoading(false);
       }
@@ -68,9 +69,18 @@ export default function MobileProfile() {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const uri = result.assets[0].uri;
-        updateUser({ avatar_url: uri });
-        if (profile) setProfile({ ...profile, avatar_url: uri });
-        Alert.alert('Avatar Updated', 'Profile photo updated successfully.');
+        setUploadingAvatar(true);
+        try {
+          const uploadRes = await mobileApi.uploadAvatar(uri);
+          const finalUrl = uploadRes.avatar_url || uri;
+          updateUser({ avatar_url: finalUrl });
+          if (profile) setProfile({ ...profile, avatar_url: finalUrl });
+          Alert.alert('Avatar Updated', 'Profile photo updated successfully.');
+        } catch (uploadErr: any) {
+          Alert.alert('Upload Error', uploadErr.message || 'Failed to upload avatar to cloud storage.');
+        } finally {
+          setUploadingAvatar(false);
+        }
       }
     } catch (e) {
       console.warn('Avatar picker error:', e);
@@ -81,8 +91,8 @@ export default function MobileProfile() {
     try {
       setSavingProfile(true);
       const updated = await mobileApi.updateProfile({
-        full_name: fullName,
-        phone,
+        full_name: fullName.trim(),
+        phone: phone.trim() || undefined,
       });
       setProfile(updated);
       updateUser({ full_name: updated.full_name, phone: updated.phone });
@@ -101,7 +111,7 @@ export default function MobileProfile() {
     }
     try {
       setSavingPassword(true);
-      Alert.alert('Success', 'Password updated successfully.');
+      Alert.alert('Success', 'Password update request processed.');
       setNewPassword('');
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Could not update password');
@@ -124,6 +134,10 @@ export default function MobileProfile() {
     ]);
   };
 
+  const displayName = profile?.full_name || user?.full_name || 'User';
+  const displayEmail = user?.email || '';
+  const displayRole = (profile?.role || user?.role) === 'admin' ? 'Family Admin' : 'Family Member';
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
@@ -142,26 +156,26 @@ export default function MobileProfile() {
                   style={styles.avatarImage}
                 />
               ) : (
-                <Text style={styles.avatarText}>{profile?.full_name?.charAt(0) || 'R'}</Text>
+                <Text style={styles.avatarText}>{displayName.charAt(0)}</Text>
               )}
             </View>
-            <TouchableOpacity style={styles.cameraBadge} onPress={handlePickAvatar}>
-              <MaterialCommunityIcons name="camera" size={16} color="#FFFFFF" />
+            <TouchableOpacity style={styles.cameraBadge} onPress={handlePickAvatar} disabled={uploadingAvatar}>
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <MaterialCommunityIcons name="camera" size={16} color="#FFFFFF" />
+              )}
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.userName, { color: colors.text }]}>
-            {profile?.full_name || user?.full_name || 'Ramesh Kumar'}
-          </Text>
-          <Text style={[styles.userEmail, { color: colors.subtext }]}>
-            {user?.email || 'ramesh@example.com'}
-          </Text>
+          <Text style={[styles.userName, { color: colors.text }]}>{displayName}</Text>
+          <Text style={[styles.userEmail, { color: colors.subtext }]}>{displayEmail}</Text>
 
           {/* Badges */}
           <View style={styles.badgesRow}>
             <View style={styles.badgePrimary}>
               <MaterialCommunityIcons name="shield-check" size={14} color="#4338CA" />
-              <Text style={styles.badgePrimaryText}>Family Admin</Text>
+              <Text style={styles.badgePrimaryText}>{displayRole}</Text>
             </View>
             <View style={[styles.badgeSecondary, { backgroundColor: colors.background }]}>
               <MaterialCommunityIcons name="account-group" size={14} color={colors.subtext} />
